@@ -57,7 +57,11 @@ class TabPool {
   }
 
   async closeAll(): Promise<void> {
-    await Promise.all(this.idle.map((t) => t.close()));
+    // Resolve any pending waiters with a dummy page so their promises settle
+    const dummy = this.idle[0];
+    while (this.waiters.length > 0 && dummy) this.waiters.shift()!(dummy);
+    await Promise.all(this.idle.map((t) => t.close().catch(() => {})));
+    this.idle = [];
   }
 }
 
@@ -108,7 +112,7 @@ async function scrapePage(
     const startTime = Date.now();
     const response = await tab.goto(url, {
       waitUntil: takeScreenshot ? 'load' : 'domcontentloaded',
-      timeout: 15_000,
+      timeout: takeScreenshot ? 30_000 : 15_000,
     });
     const loadTimeMs = Date.now() - startTime;
     const httpStatus = response?.status() ?? 0;
@@ -163,7 +167,11 @@ async function scrapePage(
 
     let screenshot: Buffer | undefined;
     if (takeScreenshot) {
-      screenshot = (await tab.screenshot({ fullPage: true })) as Buffer;
+      try {
+        screenshot = (await tab.screenshot({ fullPage: true, timeout: 30_000 })) as Buffer;
+      } catch {
+        // screenshot timed out or failed — continue without it
+      }
     }
 
     return {

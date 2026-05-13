@@ -151,4 +151,7 @@ async function main(): Promise<void> {
   process.exit(hasCritical ? 1 : 0);
 }
 
-main();
+main().catch((err) => {
+  console.error(chalk.red('\nFatal error:'), err);
+  process.exit(2);
+});
