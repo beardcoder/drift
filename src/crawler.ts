@@ -281,8 +281,12 @@ export async function crawlSite(
       currentLevel = nextLevel;
     }
   } finally {
-    await pool.closeAll();
-    await browser.close();
+    await Promise.race([
+      (async () => { await pool.closeAll(); await browser.close(); })(),
+      new Promise<void>((resolve) => setTimeout(resolve, 10_000)),
+    ]);
+    // Force-kill Chromium if it didn't exit within the grace period
+    browser.process()?.kill();
   }
 
   return { baseUrl: normalizedBase, pages, failedUrls };
