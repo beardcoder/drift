@@ -82,7 +82,6 @@ function visualDiff(
       alpha: 0.15,
     });
 
-    // Encode diff RGBA → PNG
     const diffPngObj = new PNG({ width, height });
     (diffPngObj.data as unknown as Uint8Array).set(diffData);
     const diffPng = PNG.sync.write(diffPngObj) as unknown as Buffer;
@@ -101,7 +100,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'status',
       severity: 'critical',
-      description: 'HTTP-Status geändert',
+      description: 'HTTP status changed',
       before: String(pageA.status),
       after: String(pageB.status),
     });
@@ -109,7 +108,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'status',
       severity: 'critical',
-      description: `Seite antwortet mit ${pageB.status}`,
+      description: `Page responded with ${pageB.status}`,
       before: String(pageA.status),
       after: String(pageB.status),
     });
@@ -123,14 +122,14 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'console_errors',
       severity: 'critical',
-      description: `${newErrors.length} neue JavaScript-Fehler`,
-      before: `${pageA.consoleErrors.length} Fehler`,
+      description: `${newErrors.length} new JavaScript error${newErrors.length > 1 ? 's' : ''}`,
+      before: `${pageA.consoleErrors.length} error${pageA.consoleErrors.length !== 1 ? 's' : ''}`,
       after: newErrors.slice(0, 3).join('\n') +
-        (newErrors.length > 3 ? `\n… +${newErrors.length - 3} weitere` : ''),
+        (newErrors.length > 3 ? `\n… +${newErrors.length - 3} more` : ''),
     });
   }
 
-  // Failed network requests (assets, scripts, stylesheets)
+  // Failed network requests (scripts, stylesheets, fetch, xhr)
   const newFailed = pageB.failedRequests.filter(
     (r) => !pageA.failedRequests.some((a) => a.url === r.url),
   );
@@ -141,13 +140,13 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'failed_assets',
       severity: 'critical',
-      description: `${criticalFailed.length} neue fehlgeschlagene Ressourcen`,
+      description: `${criticalFailed.length} new failed resource${criticalFailed.length > 1 ? 's' : ''}`,
       before: '',
       after: criticalFailed
         .slice(0, 3)
         .map((r) => `[${r.status}] ${r.resourceType}: ${new URL(r.url).pathname}`)
         .join('\n') +
-        (criticalFailed.length > 3 ? `\n… +${criticalFailed.length - 3} weitere` : ''),
+        (criticalFailed.length > 3 ? `\n… +${criticalFailed.length - 3} more` : ''),
     });
   }
   const otherFailed = newFailed.filter(
@@ -157,7 +156,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'failed_resources',
       severity: 'warning',
-      description: `${otherFailed.length} neue fehlgeschlagene Ressourcen (${otherFailed.map((r) => r.resourceType).join(', ')})`,
+      description: `${otherFailed.length} new failed resource${otherFailed.length > 1 ? 's' : ''} (${otherFailed.map((r) => r.resourceType).join(', ')})`,
       before: '',
       after: otherFailed
         .slice(0, 3)
@@ -171,7 +170,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'title',
       severity: 'warning',
-      description: 'Seitentitel geändert',
+      description: 'Page title changed',
       before: pageA.title,
       after: pageB.title,
     });
@@ -185,7 +184,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'meta_description',
       severity: 'info',
-      description: 'Meta-Description geändert',
+      description: 'Meta description changed',
       before: pageA.metaDescription,
       after: pageB.metaDescription,
     });
@@ -197,13 +196,13 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'h1',
       severity: 'warning',
-      description: 'H1-Überschriften geändert',
-      before: pageA.headings.h1.join(' | ') || '(keine)',
-      after: pageB.headings.h1.join(' | ') || '(keine)',
+      description: 'H1 headings changed',
+      before: pageA.headings.h1.join(' | ') || '(none)',
+      after: pageB.headings.h1.join(' | ') || '(none)',
     });
   }
 
-  // Word count (>20% change = warning, >50% = escalate)
+  // Word count (>20% change = info, >50% = warning)
   if (pageA.wordCount > 0 || pageB.wordCount > 0) {
     const base = Math.max(pageA.wordCount, 1);
     const delta = Math.abs(pageA.wordCount - pageB.wordCount);
@@ -212,20 +211,20 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
       diffs.push({
         field: 'word_count',
         severity: pct >= 50 ? 'warning' : 'info',
-        description: `Textmenge um ${pct.toFixed(0)}% verändert`,
-        before: `${pageA.wordCount} Wörter`,
-        after: `${pageB.wordCount} Wörter`,
+        description: `Word count changed by ${pct.toFixed(0)}%`,
+        before: `${pageA.wordCount} word${pageA.wordCount !== 1 ? 's' : ''}`,
+        after: `${pageB.wordCount} word${pageB.wordCount !== 1 ? 's' : ''}`,
       });
     }
   }
 
-  // Internal links removed (important for navigation regressions)
+  // Internal links
   const linkDiff = arrayDiff(pageA.internalLinks, pageB.internalLinks);
   if (linkDiff.removed.length > 0) {
     diffs.push({
       field: 'links_removed',
       severity: 'warning',
-      description: `${linkDiff.removed.length} interne Links entfernt`,
+      description: `${linkDiff.removed.length} internal link${linkDiff.removed.length > 1 ? 's' : ''} removed`,
       before: linkDiff.removed.slice(0, 5).join(', ') +
         (linkDiff.removed.length > 5 ? ` … +${linkDiff.removed.length - 5}` : ''),
       after: '',
@@ -235,7 +234,7 @@ function diffPages(pageA: PageData, pageB: PageData): Difference[] {
     diffs.push({
       field: 'links_added',
       severity: 'info',
-      description: `${linkDiff.added.length} interne Links hinzugekommen`,
+      description: `${linkDiff.added.length} internal link${linkDiff.added.length > 1 ? 's' : ''} added`,
       before: '',
       after: linkDiff.added.slice(0, 5).join(', ') +
         (linkDiff.added.length > 5 ? ` … +${linkDiff.added.length - 5}` : ''),
@@ -271,7 +270,7 @@ export async function compareSites(
           {
             field: 'existence',
             severity: 'critical',
-            description: 'Seite existiert nur in Site B (neu)',
+            description: 'Page only exists in site B (new)',
           },
         ],
       });
@@ -287,7 +286,7 @@ export async function compareSites(
           {
             field: 'existence',
             severity: 'critical',
-            description: 'Seite fehlt in Site B (entfernt oder 404)',
+            description: 'Page missing in site B (removed or 404)',
           },
         ],
       });
@@ -308,9 +307,9 @@ export async function compareSites(
           differences.push({
             field: 'visual',
             severity: percent > diffThresholdPercent * 2 ? 'warning' : 'info',
-            description: `Visuell ${percent.toFixed(1)}% unterschiedlich (Schwellwert: ${diffThresholdPercent}%)`,
-            before: '(Screenshot A)',
-            after: '(Screenshot B)',
+            description: `Visually ${percent.toFixed(1)}% different (threshold: ${diffThresholdPercent}%)`,
+            before: '(screenshot A)',
+            after: '(screenshot B)',
           });
         }
       }

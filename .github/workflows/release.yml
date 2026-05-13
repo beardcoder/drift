@@ -50,6 +50,7 @@ jobs:
         run: bun run scripts/prebuild.ts
 
       - name: Build binary
+        shell: bash
         run: |
           bun build --compile --minify --bytecode \
             --target=${{ matrix.target }} \

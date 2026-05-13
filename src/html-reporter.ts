@@ -1,8 +1,8 @@
 import type { ComparisonReport, PageComparison, Difference, Severity } from './types.js';
 
 const SEVERITY_LABEL: Record<Severity, string> = {
-  critical: 'Kritisch',
-  warning: 'Warnung',
+  critical: 'Critical',
+  warning: 'Warning',
   info: 'Info',
 };
 
@@ -22,10 +22,10 @@ function renderDiff(d: Difference): string {
   const cls = d.severity;
   const label = SEVERITY_LABEL[d.severity];
   const before = d.before
-    ? `<div class="diff-before"><span class="diff-label">vorher</span><code>${esc(d.before)}</code></div>`
+    ? `<div class="diff-before"><span class="diff-label">before</span><code>${esc(d.before)}</code></div>`
     : '';
   const after = d.after
-    ? `<div class="diff-after"><span class="diff-label">nachher</span><code>${esc(d.after)}</code></div>`
+    ? `<div class="diff-after"><span class="diff-label">after</span><code>${esc(d.after)}</code></div>`
     : '';
   return `
     <div class="diff-item ${cls}">
@@ -42,7 +42,7 @@ function renderScreenshots(comp: PageComparison): string {
   if (!comp.screenshots) return '';
   const { a, b, diff } = comp.screenshots;
   const pct = comp.visualDiffPercent;
-  const pctLabel = pct != null ? `${pct.toFixed(1)}% Unterschied` : '';
+  const pctLabel = pct != null ? `${pct.toFixed(1)}% difference` : '';
 
   return `
     <div class="screenshots">
@@ -59,7 +59,7 @@ function renderScreenshots(comp: PageComparison): string {
           </div>
           <div class="cs-handle"></div>
           <input class="cs-range" type="range" min="0" max="100" value="50"
-            oninput="updateSlider(this,'cs-${comp.path.replace(/\W/g, '_')}')" aria-label="Vergleich">
+            oninput="updateSlider(this,'cs-${comp.path.replace(/\W/g, '_')}')" aria-label="Comparison">
         </div>
         <div class="cs-labels">
           <span>Site A</span>
@@ -69,7 +69,7 @@ function renderScreenshots(comp: PageComparison): string {
 
       ${diff ? `
       <div class="sview" id="diff-${comp.path.replace(/\W/g, '_')}">
-        <img class="diff-img" src="${b64png(diff)}" alt="Visueller Diff" loading="lazy">
+        <img class="diff-img" src="${b64png(diff)}" alt="Visual diff" loading="lazy">
       </div>` : ''}
     </div>`;
 }
@@ -87,9 +87,9 @@ function renderPage(comp: PageComparison, idx: number): string {
   const id = `p${idx}`;
 
   const statusLabel =
-    comp.status === 'only_in_a' ? 'Fehlt in B' :
-    comp.status === 'only_in_b' ? 'Neu in B' :
-    comp.status === 'identical' ? 'Identisch' : 'Geändert';
+    comp.status === 'only_in_a' ? 'Missing in B' :
+    comp.status === 'only_in_b' ? 'New in B' :
+    comp.status === 'identical' ? 'Identical' : 'Changed';
 
   const urlLine = comp.urlA || comp.urlB
     ? `<div class="page-urls">
@@ -108,7 +108,7 @@ function renderPage(comp: PageComparison, idx: number): string {
         <code>${esc(comp.path)}</code>
       </div>
       <div class="page-meta">
-        ${diffCount > 0 ? `<span class="diff-count">${diffCount} Diff${diffCount > 1 ? 's' : ''}</span>` : ''}
+        ${diffCount > 0 ? `<span class="diff-count">${diffCount} diff${diffCount > 1 ? 's' : ''}</span>` : ''}
         <span class="badge ${sev}">${statusLabel}</span>
       </div>
     </header>
@@ -140,7 +140,7 @@ export function generateHtmlReport(report: ComparisonReport): string {
     : new Date(report.timestamp);
 
   return `<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -273,27 +273,27 @@ body{font:15px/1.6 system-ui,sans-serif;background:var(--bg);color:var(--text);p
 <header class="report-header">
   <div class="report-title">
     drift
-    <span>${esc(ts.toLocaleString('de-DE'))}</span>
+    <span>${esc(ts.toLocaleString('en-GB'))}</span>
   </div>
   <div class="report-sites">
     <span>A:</span><a href="${esc(report.siteA)}" target="_blank">${esc(report.siteA)}</a>
     <span>B:</span><a href="${esc(report.siteB)}" target="_blank">${esc(report.siteB)}</a>
   </div>
   <div class="stat-bar">
-    <div class="stat stat-all active" onclick="filterBy('all',this)">${report.comparisons.length} Seiten total</div>
-    ${nCrit > 0 ? `<div class="stat stat-crit" onclick="filterBy('critical',this)">✖ ${nCrit} Kritisch</div>` : ''}
-    ${nWarn > 0 ? `<div class="stat stat-warn" onclick="filterBy('warning',this)">⚠ ${nWarn} Warnung</div>` : ''}
+    <div class="stat stat-all active" onclick="filterBy('all',this)">${report.comparisons.length} pages total</div>
+    ${nCrit > 0 ? `<div class="stat stat-crit" onclick="filterBy('critical',this)">✖ ${nCrit} Critical</div>` : ''}
+    ${nWarn > 0 ? `<div class="stat stat-warn" onclick="filterBy('warning',this)">⚠ ${nWarn} Warning</div>` : ''}
     ${nInfo > 0 ? `<div class="stat stat-info" onclick="filterBy('info',this)">· ${nInfo} Info</div>` : ''}
-    ${nOk > 0 ? `<div class="stat stat-ok" onclick="filterBy('none',this)">✔ ${nOk} Identisch</div>` : ''}
+    ${nOk > 0 ? `<div class="stat stat-ok" onclick="filterBy('none',this)">✔ ${nOk} Identical</div>` : ''}
   </div>
 </header>
 
 <div class="toolbar">
-  <button class="filter-btn active" onclick="filterBy('all',this)">Alle</button>
-  <button class="filter-btn" onclick="filterBy('critical',this)">Nur kritisch</button>
-  <button class="filter-btn" onclick="filterBy('warning',this)">Nur Warnungen</button>
-  <button class="filter-btn" onclick="filterBy('changed',this)">Alle Abweichungen</button>
-  <span class="toolbar-right" id="visible-count">${changed.length} Abweichungen</span>
+  <button class="filter-btn active" onclick="filterBy('all',this)">All</button>
+  <button class="filter-btn" onclick="filterBy('critical',this)">Critical only</button>
+  <button class="filter-btn" onclick="filterBy('warning',this)">Warnings</button>
+  <button class="filter-btn" onclick="filterBy('changed',this)">All changes</button>
+  <span class="toolbar-right" id="visible-count">${changed.length} changes</span>
 </div>
 
 <main class="main">
@@ -303,7 +303,7 @@ ${changed.map((c, i) => renderPage(c, i)).join('\n')}
 ${identical.length > 0 ? `
 <div class="identical-section">
   <div class="identical-toggle" onclick="toggleIdentical(this)">
-    ▶ ${nOk} identische Seiten anzeigen
+    ▶ ${nOk} identical pages
   </div>
   <div class="identical-list" id="identical-list">
     ${identical.map((c) => `<span class="identical-path">${esc(c.path)}</span>`).join('')}
@@ -333,11 +333,11 @@ function filterBy(sev, btn) {
   // sync both toolbars
   document.querySelectorAll('.filter-btn, .stat').forEach(b => {
     const matches =
-      (sev === 'all' && (b.textContent.includes('Alle') || b.textContent.includes('total'))) ||
-      (sev === 'critical' && b.textContent.includes('Kritisch')) ||
-      (sev === 'warning' && b.textContent.includes('Warnung')) ||
-      (sev === 'none' && b.textContent.includes('Identisch')) ||
-      (sev === 'changed' && b.textContent.includes('Abweichungen'));
+      (sev === 'all' && (b.textContent.includes('All') || b.textContent.includes('total'))) ||
+      (sev === 'critical' && b.textContent.includes('Critical')) ||
+      (sev === 'warning' && b.textContent.includes('Warning')) ||
+      (sev === 'none' && b.textContent.includes('Identical')) ||
+      (sev === 'changed' && b.textContent.includes('changes'));
     if (matches) b.classList.add('active');
   });
   let visible = 0;
@@ -350,7 +350,7 @@ function filterBy(sev, btn) {
     card.classList.toggle('filtered', !show);
     if (show) visible++;
   });
-  document.getElementById('visible-count').textContent = visible + ' Seiten';
+  document.getElementById('visible-count').textContent = visible + ' pages';
 }
 
 // Screenshot tab switching

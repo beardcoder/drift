@@ -23,12 +23,12 @@ function truncate(str: string, max = 80): string {
 function printPageComparison(comp: PageComparison, index: number): void {
   const statusLabel =
     comp.status === 'only_in_a'
-      ? chalk.red('← nur A')
+      ? chalk.red('← only in A')
       : comp.status === 'only_in_b'
-        ? chalk.green('→ nur B')
+        ? chalk.green('→ only in B')
         : comp.status === 'identical'
-          ? chalk.green('✔ identisch')
-          : chalk.yellow('≠ geändert');
+          ? chalk.green('✔ identical')
+          : chalk.yellow('≠ changed');
 
   const header = `${chalk.bold(comp.path)}  ${statusLabel}`;
   if (index > 0) process.stdout.write('\n');
@@ -43,14 +43,13 @@ function printPageComparison(comp: PageComparison, index: number): void {
     console.log(`  ${color(icon)} ${color(diff.field.padEnd(20))}  ${diff.description}`);
 
     if (diff.before !== undefined && diff.before !== '') {
-      console.log(`    ${chalk.dim('vorher:')} ${chalk.strikethrough(chalk.dim(truncate(diff.before)))}`);
+      console.log(`    ${chalk.dim('before:')} ${chalk.strikethrough(chalk.dim(truncate(diff.before)))}`);
     }
     if (diff.after !== undefined && diff.after !== '') {
-      // Multi-line "after" (e.g. console errors)
       const lines = diff.after.split('\n');
       for (const [i, line] of lines.entries()) {
         console.log(
-          `    ${i === 0 ? chalk.dim('nachher:') : '         '} ${chalk.white(truncate(line))}`,
+          `    ${i === 0 ? chalk.dim('after: ') : '         '} ${chalk.white(truncate(line))}`,
         );
       }
     }
@@ -58,16 +57,15 @@ function printPageComparison(comp: PageComparison, index: number): void {
 }
 
 export function printConsoleReport(report: ComparisonReport): void {
-  console.log('\n' + chalk.bold.underline('COMPARE-WEB — Ergebnis'));
+  console.log('\n' + chalk.bold.underline('DRIFT — Results'));
   console.log(
     `  Site A: ${chalk.cyan(report.siteA)}\n  Site B: ${chalk.cyan(report.siteB)}`,
   );
   console.log(
-    `  Seiten gecrawlt: A=${chalk.bold(report.totalPages.a)}  B=${chalk.bold(report.totalPages.b)}`,
+    `  Pages crawled: A=${chalk.bold(report.totalPages.a)}  B=${chalk.bold(report.totalPages.b)}`,
   );
-  console.log(`  Zeitstempel: ${report.timestamp.toLocaleString('de-DE')}\n`);
+  console.log(`  Timestamp: ${report.timestamp.toLocaleString('en-GB')}\n`);
 
-  // Counts
   const counts = {
     critical: 0,
     warning: 0,
@@ -90,15 +88,14 @@ export function printConsoleReport(report: ComparisonReport): void {
     }
   }
 
-  // Summary table
   const summaryTable = new Table({
     head: [
-      chalk.red.bold('Kritisch'),
-      chalk.yellow.bold('Warnung'),
+      chalk.red.bold('Critical'),
+      chalk.yellow.bold('Warning'),
       chalk.cyan.bold('Info'),
-      chalk.green.bold('Identisch'),
-      chalk.red('Fehlt in B'),
-      chalk.blue('Neu in B'),
+      chalk.green.bold('Identical'),
+      chalk.red('Missing in B'),
+      chalk.blue('New in B'),
     ],
     style: { head: [], border: ['dim'] },
   });
@@ -112,10 +109,9 @@ export function printConsoleReport(report: ComparisonReport): void {
   ]);
   console.log(summaryTable.toString());
 
-  // Crawl errors
   const totalCrawlFailed = report.failedUrls.a.length + report.failedUrls.b.length;
   if (totalCrawlFailed > 0) {
-    console.log(chalk.red(`\n⚠ Crawl-Fehler: ${totalCrawlFailed} URLs konnten nicht geladen werden`));
+    console.log(chalk.red(`\n⚠ Crawl errors: ${totalCrawlFailed} URLs could not be loaded`));
     for (const f of report.failedUrls.a) {
       console.log(chalk.dim(`  A: ${f.url}  →  ${f.reason.split('\n')[0]}`));
     }
@@ -124,15 +120,14 @@ export function printConsoleReport(report: ComparisonReport): void {
     }
   }
 
-  // Skip identical pages unless there's nothing else to show
   const significant = report.comparisons.filter((c) => c.status !== 'identical');
 
   if (significant.length === 0) {
-    console.log(chalk.green.bold('\n✔ Alle Seiten identisch — keine Abweichungen gefunden.'));
+    console.log(chalk.green.bold('\n✔ All pages identical — no regressions found.'));
     return;
   }
 
-  console.log(`\n${chalk.bold(`Detaillierte Unterschiede (${significant.length} Seiten):`)}`);
+  console.log(`\n${chalk.bold(`Detailed differences (${significant.length} pages):`)}`);
 
   for (const [i, comp] of significant.entries()) {
     printPageComparison(comp, i);
@@ -140,13 +135,12 @@ export function printConsoleReport(report: ComparisonReport): void {
 
   console.log('\n' + chalk.dim('─'.repeat(80)));
 
-  // Exit message
   if (counts.critical > 0) {
-    console.log(chalk.red.bold(`\n✖ ${counts.critical} kritische Probleme gefunden.`));
+    console.log(chalk.red.bold(`\n✖ ${counts.critical} critical issue${counts.critical > 1 ? 's' : ''} found.`));
   } else if (counts.warning > 0) {
-    console.log(chalk.yellow.bold(`\n⚠ Keine kritischen Fehler, aber ${counts.warning} Warnungen.`));
+    console.log(chalk.yellow.bold(`\n⚠ No critical issues, but ${counts.warning} warning${counts.warning > 1 ? 's' : ''}.`));
   } else {
-    console.log(chalk.green.bold('\n✔ Keine kritischen Fehler oder Warnungen.'));
+    console.log(chalk.green.bold('\n✔ No critical issues or warnings.'));
   }
 }
 
@@ -154,7 +148,6 @@ export function printJsonReport(report: ComparisonReport): string {
   const output = {
     ...report,
     timestamp: report.timestamp.toISOString(),
-    // Omit screenshot buffers from JSON
     comparisons: report.comparisons.map((c) => ({
       path: c.path,
       status: c.status,
