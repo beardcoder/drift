@@ -286,7 +286,8 @@ export async function crawlSite(
       new Promise<void>((resolve) => setTimeout(resolve, 10_000)),
     ]);
     // Force-kill Chromium if it didn't exit within the grace period
-    browser.process()?.kill();
+    // browser.process may be undefined in the compiled binary
+    browser.process?.()?.kill();
   }
 
   return { baseUrl: normalizedBase, pages, failedUrls };
