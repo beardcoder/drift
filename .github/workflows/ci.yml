@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Prebuild stubs
+        run: bun run scripts/prebuild.ts
+
+      - name: Build binary
+        run: bun build --compile --minify --bytecode src/index.ts --outfile dist/drift
+
+      - name: Verify binary starts
+        run: ./dist/drift --version
