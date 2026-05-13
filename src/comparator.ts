@@ -56,8 +56,8 @@ function visualDiff(
   bufB: Buffer,
 ): { percent: number; diffPng: Buffer | undefined } {
   try {
-    let imgA = PNG.sync.read(bufA);
-    let imgB = PNG.sync.read(bufB);
+    let imgA: PNG = PNG.sync.read(bufA);
+    let imgB: PNG = PNG.sync.read(bufB);
 
     const factor = Math.max(1, Math.floor(imgA.width / DIFF_MAX_WIDTH));
     if (factor > 1) {

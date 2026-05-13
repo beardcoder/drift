@@ -1,6 +1,6 @@
 {
   "name": "drift",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Crawl two websites and detect regressions — built for build-tool migrations and refactors",
   "type": "module",
   "bin": {
@@ -10,17 +10,16 @@
     "start": "bun run src/index.ts",
     "postinstall": "bunx playwright install chromium",
     "prebuild": "bun run scripts/prebuild.ts",
-    "build": "bun build --compile --minify --bytecode src/index.ts --outfile ./dist/drift",
+    "build": "bun run prebuild && bun build --compile --minify --bytecode src/index.ts --outfile ./dist/drift",
     "build:linux-x64": "bun run prebuild && bun build --compile --minify --bytecode --target=bun-linux-x64 src/index.ts --outfile ./dist/drift-linux-x64",
     "build:linux-arm64": "bun run prebuild && bun build --compile --minify --bytecode --target=bun-linux-arm64 src/index.ts --outfile ./dist/drift-linux-arm64",
     "build:win": "bun run prebuild && bun build --compile --minify --bytecode --target=bun-windows-x64 src/index.ts --outfile ./dist/drift-windows-x64.exe",
-    "build:all": "bun run build && bun run build:linux-x64 && bun run build:linux-arm64"
+    "build:all": "bun run build && bun run build:linux-x64 && bun run build:linux-arm64 && bun run build:win"
   },
   "dependencies": {
     "chalk": "^5.3.0",
     "cli-table3": "^0.6.3",
     "commander": "^12.1.0",
-    "ora": "^8.1.0",
     "pixelmatch": "^5.3.0",
     "playwright": "^1.44.0",
     "pngjs": "^7.0.0"

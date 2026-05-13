@@ -68,7 +68,8 @@ export interface ComparisonReport {
 export interface CLIOptions {
   depth: number;
   maxPages: number;
-  concurrency: number;
+  timeoutMs: number;
+  userAgent: string;
   screenshot: boolean;
   diffThreshold: number;
   ignore: string[];
@@ -76,4 +77,11 @@ export interface CLIOptions {
   outFile?: string;
   report?: string;
   viewport: { width: number; height: number };
+}
+
+export interface CrawlProgress {
+  site: 'A' | 'B';
+  done: number;
+  depth: number;
+  url: string;
 }

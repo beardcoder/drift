@@ -1,8 +1,8 @@
-import chalk from 'chalk';
+import chalk, { type ChalkInstance } from 'chalk';
 import Table from 'cli-table3';
 import type { ComparisonReport, PageComparison, Severity } from './types.js';
 
-const SEVERITY_COLOR: Record<Severity, chalk.Chalk> = {
+const SEVERITY_COLOR: Record<Severity, ChalkInstance> = {
   critical: chalk.red.bold,
   warning: chalk.yellow,
   info: chalk.cyan,

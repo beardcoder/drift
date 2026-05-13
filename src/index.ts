@@ -1,13 +1,16 @@
 #!/usr/bin/env bun
 import { Command } from 'commander';
-import ora from 'ora';
 import chalk from 'chalk';
 import { writeFileSync } from 'node:fs';
 import { crawlSite } from './crawler.js';
 import { compareSites } from './comparator.js';
 import { printConsoleReport, printJsonReport } from './reporter.js';
 import { generateHtmlReport } from './html-reporter.js';
+import { LiveStatus } from './progress.js';
 import type { CLIOptions } from './types.js';
+
+const VERSION = '1.1.0';
+const DEFAULT_USER_AGENT = `drift/${VERSION}`;
 
 const program = new Command();
 
@@ -16,12 +19,13 @@ program
   .description(
     'Crawl two websites and detect regressions — built for build-tool migrations and refactors',
   )
-  .version('1.0.0')
+  .version(VERSION)
   .argument('<url-a>', 'Base URL of the original site (e.g. webpack dev server)')
   .argument('<url-b>', 'Base URL of the new site (e.g. Vite dev server)')
   .option('-d, --depth <n>', 'Crawl depth (0 = homepage only)', '2')
   .option('-m, --max-pages <n>', 'Maximum pages per site', '200')
-  .option('-c, --concurrency <n>', 'Parallel browser tabs', '3')
+  .option('--timeout-ms <ms>', 'Navigation timeout per page in milliseconds', '15000')
+  .option('--user-agent <ua>', 'User-Agent header for browser navigations', DEFAULT_USER_AGENT)
   .option('-s, --screenshot', 'Take full-page screenshots and compare visually', false)
   .option(
     '-t, --diff-threshold <pct>',
@@ -58,10 +62,11 @@ ${chalk.bold('Examples:')}
 program.parse();
 
 const [urlA, urlB] = program.args as [string, string];
-const opts = program.opts<{
+const rawOpts = program.opts<{
   depth: string;
   maxPages: string;
-  concurrency: string;
+  timeoutMs: string;
+  userAgent: string;
   screenshot: boolean;
   diffThreshold: string;
   ignore: string[];
@@ -71,57 +76,44 @@ const opts = program.opts<{
   viewport: string;
 }>();
 
-const [vpW, vpH] = opts.viewport.split('x').map(Number);
+const [vpW, vpH] = rawOpts.viewport.split('x').map(Number);
 const options: CLIOptions = {
-  depth: Math.max(0, parseInt(opts.depth, 10)),
-  maxPages: Math.max(1, parseInt(opts.maxPages, 10)),
-  concurrency: Math.max(1, Math.min(10, parseInt(opts.concurrency, 10))),
-  screenshot: opts.screenshot,
-  diffThreshold: parseFloat(opts.diffThreshold),
-  ignore: opts.ignore,
-  output: opts.output as CLIOptions['output'],
-  outFile: opts.outFile,
-  report: opts.report,
+  depth: Math.max(0, parseInt(rawOpts.depth, 10)),
+  maxPages: Math.max(1, parseInt(rawOpts.maxPages, 10)),
+  timeoutMs: Math.max(1000, parseInt(rawOpts.timeoutMs, 10)),
+  userAgent: rawOpts.userAgent,
+  screenshot: rawOpts.screenshot,
+  diffThreshold: parseFloat(rawOpts.diffThreshold),
+  ignore: rawOpts.ignore,
+  output: (rawOpts.output === 'json' ? 'json' : 'console') as CLIOptions['output'],
+  outFile: rawOpts.outFile,
+  report: rawOpts.report,
   viewport: { width: vpW ?? 1440, height: vpH ?? 900 },
 };
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
-  console.log(chalk.bold('\n  drift') + chalk.dim('  v1.0.0'));
-  console.log(chalk.dim(`  A: ${urlA}`));
-  console.log(chalk.dim(`  B: ${urlB}`));
-  console.log(
-    chalk.dim(
-      `  Depth: ${options.depth}  Max: ${options.maxPages} pages  Concurrency: ${options.concurrency}\n`,
-    ),
-  );
+  printHeader();
 
-  const spinnerA = ora({ text: `Crawling site A … (depth 0)`, color: 'cyan' }).start();
-  const resultA = await crawlSite(urlA, options, ({ done, total, depth, url }) => {
-    const shortUrl = url.length > 55 ? '…' + url.slice(-54) : url;
-    spinnerA.text = `Site A  [depth ${depth}]  ${done}/${total} pages — ${shortUrl}`;
-  });
-  spinnerA.succeed(
-    `Site A crawled: ${resultA.pages.size} pages` +
-      (resultA.pages.size >= options.maxPages ? chalk.yellow(` (limit reached)`) : '') +
-      (resultA.failedUrls.length ? chalk.red(` · ${resultA.failedUrls.length} errors`) : ''),
-  );
+  const status = new LiveStatus();
+  status.start();
 
-  const spinnerB = ora({ text: `Crawling site B … (depth 0)`, color: 'green' }).start();
-  const resultB = await crawlSite(urlB, options, ({ done, total, depth, url }) => {
-    const shortUrl = url.length > 55 ? '…' + url.slice(-54) : url;
-    spinnerB.text = `Site B  [depth ${depth}]  ${done}/${total} pages — ${shortUrl}`;
-  });
-  spinnerB.succeed(
-    `Site B crawled: ${resultB.pages.size} pages` +
-      (resultB.pages.size >= options.maxPages ? chalk.yellow(` (limit reached)`) : '') +
-      (resultB.failedUrls.length ? chalk.red(` · ${resultB.failedUrls.length} errors`) : ''),
-  );
+  const startedAt = Date.now();
+  const [resultA, resultB] = await Promise.all([
+    crawlSite('A', urlA, options, (progress) => status.update(progress)).then((result) => {
+      status.finishSite('A', result.pages.size, result.failedUrls.length);
+      return result;
+    }),
+    crawlSite('B', urlB, options, (progress) => status.update(progress)).then((result) => {
+      status.finishSite('B', result.pages.size, result.failedUrls.length);
+      return result;
+    }),
+  ]);
+  status.stop();
 
-  const spinnerCmp = ora({ text: 'Comparing pages …', color: 'yellow' }).start();
+  const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+  console.log(chalk.dim(`\n  crawled in ${elapsed}s · comparing pages…`));
+
   const report = await compareSites(resultA, resultB, options.screenshot, options.diffThreshold);
-  spinnerCmp.succeed('Comparison complete');
 
   if (options.report) {
     const html = generateHtmlReport(report);
@@ -137,21 +129,41 @@ async function main(): Promise<void> {
     }
     if (options.output === 'json') {
       console.log(json);
-      return;
+      process.exit(hasCritical(report) ? 1 : 0);
     }
   }
 
   printConsoleReport(report);
-
-  const hasCritical = report.comparisons.some(
-    (c) =>
-      c.status === 'only_in_a' ||
-      c.differences.some((d) => d.severity === 'critical'),
-  );
-  process.exit(hasCritical ? 1 : 0);
+  process.exit(hasCritical(report) ? 1 : 0);
 }
 
-main().catch((err) => {
-  console.error(chalk.red('\nFatal error:'), err);
+function printHeader(): void {
+  const meta = [
+    `depth ${options.depth}`,
+    `max ${options.maxPages}`,
+    `${options.timeoutMs}ms timeout`,
+    options.screenshot ? 'screenshots' : null,
+  ]
+    .filter(Boolean)
+    .join(chalk.dim(' · '));
+
+  console.log();
+  console.log(chalk.bold('  drift') + chalk.dim(`  v${VERSION}`));
+  console.log(`  ${chalk.cyan.bold('[A]')} ${chalk.dim('→')} ${urlA}`);
+  console.log(`  ${chalk.green.bold('[B]')} ${chalk.dim('→')} ${urlB}`);
+  console.log(`  ${chalk.dim(meta)}`);
+  console.log();
+}
+
+function hasCritical(report: Awaited<ReturnType<typeof compareSites>>): boolean {
+  return report.comparisons.some(
+    (comp) =>
+      comp.status === 'only_in_a' ||
+      comp.differences.some((diff) => diff.severity === 'critical'),
+  );
+}
+
+main().catch((error) => {
+  console.error(chalk.red('\nFatal error:'), error);
   process.exit(2);
 });
