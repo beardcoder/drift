@@ -20,10 +20,6 @@ jobs:
             target: bun-darwin-arm64
             artifact: drift-macos-arm64
 
-          - os: macos-13           # Intel
-            target: bun-darwin-x64
-            artifact: drift-macos-x64
-
           - os: ubuntu-latest
             target: bun-linux-x64
             artifact: drift-linux-x64
