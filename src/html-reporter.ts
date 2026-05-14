@@ -99,20 +99,28 @@ function renderPage(comp: PageComparison, idx: number): string {
     : '';
 
   const diffCount = comp.differences.length;
+  const visualPct =
+    typeof comp.visualDiffPercent === 'number'
+      ? comp.visualDiffPercent.toFixed(comp.visualDiffPercent < 1 ? 2 : 1)
+      : null;
+  // Auto-expand pages whose only signal is visual (text identical, screenshots
+  // attached). Those exist solely so the user can scan the side-by-side images.
+  const autoOpen = comp.status === 'identical' && !!comp.screenshots;
 
   return `
-  <article class="page-card ${sev}" data-sev="${sev}" id="${id}">
+  <article class="page-card ${sev}${autoOpen ? ' open' : ''}" data-sev="${sev}" id="${id}">
     <header class="page-head" onclick="toggleCard('${id}')">
       <div class="page-path">
         <span class="page-chevron">▶</span>
         <code>${esc(comp.path)}</code>
       </div>
       <div class="page-meta">
+        ${visualPct !== null ? `<span class="visual-pct" title="Visual pixel difference">visual ${visualPct}%</span>` : ''}
         ${diffCount > 0 ? `<span class="diff-count">${diffCount} diff${diffCount > 1 ? 's' : ''}</span>` : ''}
         <span class="badge ${sev}">${statusLabel}</span>
       </div>
     </header>
-    <div class="page-body" hidden>
+    <div class="page-body"${autoOpen ? '' : ' hidden'}>
       ${urlLine}
       <div class="diffs">
         ${comp.differences.map(renderDiff).join('')}
@@ -127,8 +135,15 @@ function countSev(comparisons: PageComparison[], s: Severity): number {
 }
 
 export function generateHtmlReport(report: ComparisonReport): string {
-  const changed = report.comparisons.filter((c) => c.status !== 'identical');
-  const identical = report.comparisons.filter((c) => c.status === 'identical');
+  // Pages with screenshots are always rendered as cards (so the user can see
+  // the visual comparison) even if text content was identical. Pages without
+  // any visual data and with no text changes go into the compact list.
+  const changed = report.comparisons.filter(
+    (c) => c.status !== 'identical' || !!c.screenshots,
+  );
+  const identical = report.comparisons.filter(
+    (c) => c.status === 'identical' && !c.screenshots,
+  );
 
   const nCrit = countSev(report.comparisons, 'critical');
   const nWarn = countSev(report.comparisons, 'warning');
@@ -202,6 +217,7 @@ body{font:15px/1.6 system-ui,sans-serif;background:var(--bg);color:var(--text);p
 .page-path code{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .page-meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .diff-count{font-size:12px;color:var(--muted);background:#f0f2f5;padding:2px 8px;border-radius:10px}
+.visual-pct{font-size:12px;color:var(--info);background:var(--info-bg);border:1px solid var(--info-border);padding:2px 8px;border-radius:10px;font-variant-numeric:tabular-nums}
 
 /* Badges */
 .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px}

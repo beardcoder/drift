@@ -9,7 +9,7 @@ import { generateHtmlReport } from './html-reporter.js';
 import { LiveStatus } from './progress.js';
 import type { CLIOptions } from './types.js';
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const DEFAULT_USER_AGENT = `drift/${VERSION}`;
 
 const program = new Command();
